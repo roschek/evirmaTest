@@ -25,6 +25,23 @@ import { buildPhotoUrls } from '../lib/buildPhotoUrls';
 // would re-trigger the photoUrls/selection effect below in an infinite loop.
 const EMPTY_RANGES: HostRange[] = [];
 
+// The WB card API exposes no reliable "has video" field (confirmed against a live
+// response), so availability is discovered by HEAD-probing the CDN directly across
+// quality tiers, highest first. Returns the first quality that responds ok.
+const findAvailableVideoUrl = async (nm: number, ranges: HostRange[]): Promise<string | null> => {
+  for (const quality of VIDEO_QUALITIES) {
+    const url = generateVideoUrl({ nm, ranges, size: quality, name: 'index.mp4' });
+    if (!url) continue;
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.ok) return url;
+    } catch {
+      // network/CORS error on this quality -- try the next one
+    }
+  }
+  return null;
+};
+
 export const MediaSelectionModal = ({
   open,
   card,
@@ -43,12 +60,26 @@ export const MediaSelectionModal = ({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // undefined = still checking, null = confirmed unavailable, string = the working URL.
+  const [videoUrl, setVideoUrl] = useState<string | null | undefined>(undefined);
 
   // Select all photos by default, and whenever the resolved photo set changes
   // (e.g. host ranges arrive after the first render).
   useEffect(() => {
     setSelected(new Set(photoUrls));
   }, [photoUrls]);
+
+  useEffect(() => {
+    if (videoRanges.length === 0) return;
+    let cancelled = false;
+    setVideoUrl(undefined);
+    findAvailableVideoUrl(card.nm, videoRanges).then((url) => {
+      if (!cancelled) setVideoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [card.nm, videoRanges]);
 
   const toggle = (url: string) => {
     setSelected((prev) => {
@@ -71,29 +102,20 @@ export const MediaSelectionModal = ({
   };
 
   const downloadVideo = async () => {
+    if (!videoUrl) return;
     setBusy(true);
     try {
-      for (const quality of VIDEO_QUALITIES) {
-        const url = generateVideoUrl({
-          nm: card.nm,
-          ranges: videoRanges,
-          size: quality,
-          name: 'index.mp4',
-        });
-        if (!url) continue;
-        const res = await fetch(url);
-        if (res.ok) {
-          triggerDownload(await res.blob(), `wb-${card.nm}-${quality}.mp4`);
-          return;
-        }
-      }
-      setToast('Видео недоступно в mp4 (см. README — ограничение HLS).');
+      const res = await fetch(videoUrl);
+      if (!res.ok) throw new Error('video fetch failed');
+      triggerDownload(await res.blob(), `wb-${card.nm}.mp4`);
     } catch {
       setToast('Не удалось скачать видео.');
     } finally {
       setBusy(false);
     }
   };
+
+  const videoChecking = videoUrl === undefined;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -127,16 +149,15 @@ export const MediaSelectionModal = ({
         >
           {busy ? 'Загрузка…' : 'Скачать фото'}
         </Button>
-        {/* The WB card API exposes no reliable "has video" flag (confirmed against a
-            live response), so availability is discovered by attempting the download
-            rather than gating the button on card.hasVideo. */}
         <Button
           onClick={downloadVideo}
-          disabled={busy}
+          disabled={busy || videoChecking || !videoUrl}
           variant="outlined"
-          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
+          startIcon={
+            busy || videoChecking ? <CircularProgress size={16} color="inherit" /> : undefined
+          }
         >
-          {busy ? 'Загрузка…' : 'Скачать видео'}
+          {busy ? 'Загрузка…' : videoChecking ? 'Проверка видео…' : 'Скачать видео'}
         </Button>
         <Button onClick={onClose}>Закрыть</Button>
       </DialogActions>
