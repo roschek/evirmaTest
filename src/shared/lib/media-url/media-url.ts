@@ -27,7 +27,7 @@ export function generateVideoUrl(args: {
   name: string;
 }): string | undefined {
   const { nm, ranges, size, name } = args;
-  const vol = Math.floor(nm / 1e5);
+  const vol = nm % 144;
   const part = Math.floor(nm / 1e4);
   const host = findHost(vol, ranges);
   if (!host) return undefined;
