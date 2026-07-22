@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { generateImageUrl, generateVideoUrl } from './media-url';
-import type { HostRange } from './types';
-
-const ranges: HostRange[] = [
-  { host: 'basket-01.wbbasket.ru', vol_range_from: 0, vol_range_to: 143 },
-  { host: 'basket-15.wbbasket.ru', vol_range_from: 6000, vol_range_to: 6100 },
-];
 
 describe('generateImageUrl', () => {
   it('builds a webp image URL from vol/part derived from nm', () => {
