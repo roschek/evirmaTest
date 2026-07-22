@@ -5,8 +5,9 @@ import { normalizeCard } from '../model/normalize';
 import type { ProductCard } from '../model/types';
 
 type UpstreamsResponse = {
-  recommend?: {
+  origin?: {
     mediabasket_route_map?: { hosts?: HostRange[] }[];
+    videonme_route_map?: { hosts?: HostRange[] }[];
   };
 };
 
@@ -19,12 +20,21 @@ export const productCardApi = baseApi.injectEndpoints({
       }),
       transformResponse: (raw: unknown, _meta, nm) => normalizeCard(raw, nm),
     }),
+    // Photo CDN buckets (basket-XX.wbbasket.ru), keyed by vol range.
     getHostRanges: build.query<HostRange[], void>({
       query: () => ({ url: WB_UPSTREAMS_URL }),
       transformResponse: (raw: UpstreamsResponse) =>
-        raw.recommend?.mediabasket_route_map?.[0]?.hosts ?? [],
+        raw.origin?.mediabasket_route_map?.[0]?.hosts ?? [],
+    }),
+    // Video uses a separate CDN bucket set (videonme-basket-XX.wbbasket.ru), not the
+    // photo buckets above -- confirmed against the live /api/v3/upstreams response.
+    getVideoHostRanges: build.query<HostRange[], void>({
+      query: () => ({ url: WB_UPSTREAMS_URL }),
+      transformResponse: (raw: UpstreamsResponse) =>
+        raw.origin?.videonme_route_map?.[0]?.hosts ?? [],
     }),
   }),
 });
 
-export const { useGetCardQuery, useGetHostRangesQuery } = productCardApi;
+export const { useGetCardQuery, useGetHostRangesQuery, useGetVideoHostRangesQuery } =
+  productCardApi;
