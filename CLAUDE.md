@@ -42,6 +42,7 @@ Imports flow downward only: `app → pages → features → entities → shared`
 ## Code Style
 
 - **TypeScript:** Strict mode enforced; no `any`
+- **Functions:** Prefer arrow functions (`const f = (x) => ...`) over `function` declarations wherever possible; use modern syntax throughout (optional chaining, nullish coalescing, destructuring, `for...of`, template literals) over older equivalents
 - **RTK Query:** Api slices named in camelCase (e.g., `productCardApi`); hooks follow `useGetCardQuery` naming
 - **File naming:**
   - Directories: `kebab-case`
