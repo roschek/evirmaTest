@@ -332,11 +332,11 @@ describe('generateImageUrl', () => {
 
 describe('generateVideoUrl', () => {
   it('builds an HLS-style video URL from vol=nm%144 and part=floor(nm/1e4)', () => {
-    const nm = 6041748; // vol = 6041748 % 144 = 60, part = 604
+    const nm = 6041748; // vol = 6041748 % 144 = 84, part = 604
     const url = generateVideoUrl({ nm, ranges: [
       { host: 'vid-01.example.ru', vol_range_from: 0, vol_range_to: 100 },
     ], size: '720p', name: 'index.m3u8' });
-    expect(url).toBe('https://vid-01.example.ru/vol60/part604/6041748/hls/720p/index.m3u8');
+    expect(url).toBe('https://vid-01.example.ru/vol84/part604/6041748/hls/720p/index.m3u8');
   });
 });
 ```
