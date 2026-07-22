@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Stack, TextField, Alert } from '@mui/material';
-import { useGetCardQuery } from '@/entities/product-card';
+import { useGetCardQuery, type ProductCard } from '@/entities/product-card';
 
-export const SearchCard = ({ onFound }: { onFound: (nm: number) => void }) => {
+export const SearchCard = ({ onFound }: { onFound: (card: ProductCard) => void }) => {
   const [value, setValue] = useState('');
   const [nm, setNm] = useState<number | null>(null);
   const { data, error, isFetching } = useGetCardQuery(nm as number, { skip: nm === null });
 
   useEffect(() => {
-    if (data && nm !== null) onFound(nm);
-  }, [data, nm, onFound]);
+    if (data) onFound(data);
+  }, [data, onFound]);
 
   const submit = () => {
     const trimmed = value.trim();
