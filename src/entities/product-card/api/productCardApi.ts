@@ -11,6 +11,11 @@ type UpstreamsResponse = {
   };
 };
 
+export type UpstreamRanges = {
+  photoRanges: HostRange[];
+  videoRanges: HostRange[];
+};
+
 export const productCardApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     getCard: build.query<ProductCard, number>({
@@ -20,21 +25,18 @@ export const productCardApi = baseApi.injectEndpoints({
       }),
       transformResponse: (raw: unknown, _meta, nm) => normalizeCard(raw, nm),
     }),
-    // Photo CDN buckets (basket-XX.wbbasket.ru), keyed by vol range.
-    getHostRanges: build.query<HostRange[], void>({
+    // Single request for both CDN bucket sets: photos (basket-XX.wbbasket.ru) and
+    // video (videonme-basket-XX.wbbasket.ru) live under the same /api/v3/upstreams
+    // response, keyed by vol range -- fetched once and split in transformResponse
+    // rather than as two separate endpoints, which would double-request the same URL.
+    getUpstreams: build.query<UpstreamRanges, void>({
       query: () => ({ url: WB_UPSTREAMS_URL }),
-      transformResponse: (raw: UpstreamsResponse) =>
-        raw.origin?.mediabasket_route_map?.[0]?.hosts ?? [],
-    }),
-    // Video uses a separate CDN bucket set (videonme-basket-XX.wbbasket.ru), not the
-    // photo buckets above -- confirmed against the live /api/v3/upstreams response.
-    getVideoHostRanges: build.query<HostRange[], void>({
-      query: () => ({ url: WB_UPSTREAMS_URL }),
-      transformResponse: (raw: UpstreamsResponse) =>
-        raw.origin?.videonme_route_map?.[0]?.hosts ?? [],
+      transformResponse: (raw: UpstreamsResponse): UpstreamRanges => ({
+        photoRanges: raw.origin?.mediabasket_route_map?.[0]?.hosts ?? [],
+        videoRanges: raw.origin?.videonme_route_map?.[0]?.hosts ?? [],
+      }),
     }),
   }),
 });
 
-export const { useGetCardQuery, useGetHostRangesQuery, useGetVideoHostRangesQuery } =
-  productCardApi;
+export const { useGetCardQuery, useGetUpstreamsQuery } = productCardApi;

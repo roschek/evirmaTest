@@ -14,7 +14,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import type { ProductCard } from '@/entities/product-card';
-import { useGetHostRangesQuery, useGetVideoHostRangesQuery } from '@/entities/product-card';
+import { useGetUpstreamsQuery } from '@/entities/product-card';
 import { generateVideoUrl, type HostRange } from '@/shared/lib/media-url';
 import { buildZipFromImages, triggerDownload } from '@/shared/lib/download';
 import { VIDEO_QUALITIES } from '@/shared/config';
@@ -51,8 +51,9 @@ export const MediaSelectionModal = ({
   card: ProductCard;
   onClose: () => void;
 }) => {
-  const { data: ranges = EMPTY_RANGES, isFetching: rangesLoading } = useGetHostRangesQuery();
-  const { data: videoRanges = EMPTY_RANGES } = useGetVideoHostRangesQuery();
+  const { data: upstreams, isFetching: rangesLoading } = useGetUpstreamsQuery();
+  const ranges = upstreams?.photoRanges ?? EMPTY_RANGES;
+  const videoRanges = upstreams?.videoRanges ?? EMPTY_RANGES;
   const photoUrls = useMemo(
     () => buildPhotoUrls(card.nm, card.photoCount, ranges),
     [card.nm, card.photoCount, ranges],
