@@ -1,7 +1,11 @@
-// WB card detail API (v4), per the task's technical hints. Blocks non-browser
-// requests (403 from a plain curl/server-side call -- confirmed), so it can only
-// be verified from within the app running in an actual browser.
-export const WB_CARD_API = 'https://www.wildberries.ru/__internal/card/cards/v4/detail';
+// WB card detail API (v4). The task's technical hints point at
+// www.wildberries.ru/__internal/card/cards/v4/detail, but that endpoint 403s
+// both server-side (curl) and cross-origin from the browser (confirmed live,
+// even with a CORS-unblock extension) -- it appears to be locked to
+// same-origin requests from wildberries.ru itself, not callable from a
+// third-party SPA. Using the public mirror instead, which returns real card
+// data for cross-origin callers (see README for the full tradeoff).
+export const WB_CARD_API = 'https://card.wb.ru/cards/v4/detail';
 
 // CDN host-range map used to resolve which basket serves a given article.
 export const WB_UPSTREAMS_URL = 'https://cdn.wbbasket.ru/api/v3/upstreams';
