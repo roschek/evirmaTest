@@ -11,13 +11,19 @@ import {
   Box,
   Alert,
   Snackbar,
+  CircularProgress,
 } from '@mui/material';
 import type { ProductCard } from '@/entities/product-card';
 import { useGetHostRangesQuery, useGetVideoHostRangesQuery } from '@/entities/product-card';
-import { generateVideoUrl } from '@/shared/lib/media-url';
+import { generateVideoUrl, type HostRange } from '@/shared/lib/media-url';
 import { buildZipFromImages, triggerDownload } from '@/shared/lib/download';
 import { VIDEO_QUALITIES } from '@/shared/config';
 import { buildPhotoUrls } from '../lib/buildPhotoUrls';
+
+// Stable reference for the "no data yet" case -- a fresh `[]` literal in the
+// query's destructuring default would change identity on every render, which
+// would re-trigger the photoUrls/selection effect below in an infinite loop.
+const EMPTY_RANGES: HostRange[] = [];
 
 export const MediaSelectionModal = ({
   open,
@@ -28,8 +34,8 @@ export const MediaSelectionModal = ({
   card: ProductCard;
   onClose: () => void;
 }) => {
-  const { data: ranges = [], isFetching: rangesLoading } = useGetHostRangesQuery();
-  const { data: videoRanges = [] } = useGetVideoHostRangesQuery();
+  const { data: ranges = EMPTY_RANGES, isFetching: rangesLoading } = useGetHostRangesQuery();
+  const { data: videoRanges = EMPTY_RANGES } = useGetVideoHostRangesQuery();
   const photoUrls = useMemo(
     () => buildPhotoUrls(card.nm, card.photoCount, ranges),
     [card.nm, card.photoCount, ranges],
@@ -93,6 +99,11 @@ export const MediaSelectionModal = ({
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Фото карточки {card.nm}</DialogTitle>
       <DialogContent>
+        {rangesLoading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress />
+          </Box>
+        )}
         {!rangesLoading && photoUrls.length === 0 && (
           <Alert severity="warning">Фото не найдены.</Alert>
         )}
@@ -108,14 +119,24 @@ export const MediaSelectionModal = ({
         </ImageList>
       </DialogContent>
       <DialogActions>
-        <Button onClick={downloadPhotos} disabled={busy || selected.size === 0} variant="contained">
-          Скачать фото
+        <Button
+          onClick={downloadPhotos}
+          disabled={busy || selected.size === 0}
+          variant="contained"
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
+        >
+          {busy ? 'Загрузка…' : 'Скачать фото'}
         </Button>
         {/* The WB card API exposes no reliable "has video" flag (confirmed against a
             live response), so availability is discovered by attempting the download
             rather than gating the button on card.hasVideo. */}
-        <Button onClick={downloadVideo} disabled={busy} variant="outlined">
-          Скачать видео
+        <Button
+          onClick={downloadVideo}
+          disabled={busy}
+          variant="outlined"
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
+        >
+          {busy ? 'Загрузка…' : 'Скачать видео'}
         </Button>
         <Button onClick={onClose}>Закрыть</Button>
       </DialogActions>
