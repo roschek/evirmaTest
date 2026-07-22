@@ -1,28 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Box, Button, Stack, TextField, Alert } from '@mui/material';
-import { useGetCardQuery, type ProductCard } from '@/entities/product-card';
+import { useLazyGetCardQuery, type ProductCard } from '@/entities/product-card';
 
 export const SearchCard = ({ onFound }: { onFound: (card: ProductCard) => void }) => {
   const [value, setValue] = useState('');
-  const [nm, setNm] = useState<number | null>(null);
-  const { data, error, isFetching } = useGetCardQuery(nm as number, { skip: nm === null });
+  const [invalid, setInvalid] = useState(false);
+  const [trigger, { isFetching, error }] = useLazyGetCardQuery();
 
-  useEffect(() => {
-    if (data) onFound(data);
-  }, [data, onFound]);
-
-  const submit = () => {
+  const submit = async () => {
     const trimmed = value.trim();
     const parsed = Number(trimmed);
     if (!trimmed || Number.isNaN(parsed) || parsed <= 0) {
-      setNm(null);
+      setInvalid(true);
       return;
     }
-    setNm(parsed);
+    setInvalid(false);
+    // Explicitly re-notify the parent on every submit -- even for an nm that's
+    // already cached -- instead of watching `data` for changes. Watching `data`
+    // meant re-submitting the same article after closing the modal did nothing,
+    // since the cached data never changed reference.
+    const result = await trigger(parsed);
+    if (result.data) onFound(result.data);
   };
-
-  const trimmed = value.trim();
-  const invalid = trimmed !== '' && (Number.isNaN(Number(trimmed)) || Number(trimmed) <= 0);
 
   return (
     <Box sx={{ maxWidth: 480, mx: 'auto', mt: 8 }}>

@@ -39,4 +39,4 @@ export const productCardApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useGetCardQuery, useGetUpstreamsQuery } = productCardApi;
+export const { useLazyGetCardQuery, useGetUpstreamsQuery } = productCardApi;
