@@ -2,6 +2,7 @@ import type { ProductCard } from './types';
 
 type RawProduct = {
   id?: number;
+  root?: number;
   name?: string;
   pics?: number;
   media?: { photo_count?: number; has_video?: boolean };
@@ -15,6 +16,7 @@ export const normalizeCard = (raw: unknown, nm: number): ProductCard => {
   const hasVideo = product.media?.has_video ?? false;
   return {
     nm,
+    root: product.root ?? nm,
     name: product.name ?? String(nm),
     photoCount,
     hasVideo,
