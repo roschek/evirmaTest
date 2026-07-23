@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateImageUrl, generateVideoUrl } from './media-url';
+import { generateImageUrl, generateVideoUrl, resolveVideoFeedbackUrl } from './media-url';
 
 describe('generateImageUrl', () => {
   it('builds a webp image URL from vol/part derived from nm', () => {
@@ -26,5 +26,21 @@ describe('generateVideoUrl', () => {
       { host: 'vid-01.example.ru', vol_range_from: 0, vol_range_to: 100 },
     ], size: '720p', name: 'index.m3u8' });
     expect(url).toBe('https://vid-01.example.ru/vol84/part604/6041748/hls/720p/index.m3u8');
+  });
+});
+
+describe('resolveVideoFeedbackUrl', () => {
+  it('resolves a "{shard}/{uuid}" feedback video id to its CDN playlist URL', () => {
+    const hosts = Array.from({ length: 12 }, (_, i) => `videofeedback${String(i + 1).padStart(2, '0')}.wbbasket.ru`);
+    const url = resolveVideoFeedbackUrl('8/41357dd2-f81a-4641-b18c-b0638ec512fb', hosts);
+    expect(url).toBe('https://videofeedback08.wbbasket.ru/41357dd2-f81a-4641-b18c-b0638ec512fb/index.m3u8');
+  });
+
+  it('returns undefined when the shard has no matching host', () => {
+    expect(resolveVideoFeedbackUrl('99/abc', ['videofeedback01.wbbasket.ru'])).toBeUndefined();
+  });
+
+  it('returns undefined for a malformed id', () => {
+    expect(resolveVideoFeedbackUrl('not-an-id', ['videofeedback01.wbbasket.ru'])).toBeUndefined();
   });
 });

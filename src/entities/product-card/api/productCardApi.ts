@@ -8,12 +8,30 @@ type UpstreamsResponse = {
   origin?: {
     mediabasket_route_map?: { hosts?: HostRange[] }[];
     videonme_route_map?: { hosts?: HostRange[] }[];
+    // Feedback (customer review) videos are addressed by shard index, not vol range --
+    // see resolveVideoFeedbackUrl in shared/lib/media-url.
+    videofeedback_uuid_route_map?: { hosts?: { host: string }[] }[];
   };
 };
 
 export type UpstreamRanges = {
   photoRanges: HostRange[];
   videoRanges: HostRange[];
+  videoFeedbackHosts: string[];
+};
+
+export type FeedbackVideo = {
+  id: string;
+  isReady: boolean;
+};
+
+export type Feedback = {
+  video?: FeedbackVideo;
+};
+
+export type FeedbacksResponse = {
+  feedbackCountWithVideo?: number;
+  feedbacks?: Feedback[];
 };
 
 export const productCardApi = baseApi.injectEndpoints({
@@ -34,9 +52,17 @@ export const productCardApi = baseApi.injectEndpoints({
       transformResponse: (raw: UpstreamsResponse): UpstreamRanges => ({
         photoRanges: raw.origin?.mediabasket_route_map?.[0]?.hosts ?? [],
         videoRanges: raw.origin?.videonme_route_map?.[0]?.hosts ?? [],
+        videoFeedbackHosts:
+          raw.origin?.videofeedback_uuid_route_map?.[0]?.hosts?.map((h) => h.host) ?? [],
       }),
+    }),
+    // Public, CORS-open feedbacks API keyed by the card's `root` (not nm). Used as a
+    // fallback video source when the card has no "classic" product video: many cards
+    // carry customer review videos here even without one of their own (see README).
+    getFeedbacks: build.query<FeedbacksResponse, number>({
+      query: (root) => ({ url: `https://feedbacks1.wb.ru/feedbacks/v1/${root}` }),
     }),
   }),
 });
 
-export const { useLazyGetCardQuery, useGetUpstreamsQuery } = productCardApi;
+export const { useLazyGetCardQuery, useGetUpstreamsQuery, useGetFeedbacksQuery } = productCardApi;
