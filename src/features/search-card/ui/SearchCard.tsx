@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, Button, Stack, TextField, Alert } from '@mui/material';
-import { useLazyGetCardQuery, type ProductCard } from '@/entities/product-card';
+import { useLazyGetCardQuery, getCardErrorMessage, type ProductCard } from '@/entities/product-card';
 
 export const SearchCard = ({ onFound }: { onFound: (card: ProductCard) => void }) => {
   const [value, setValue] = useState('');
@@ -37,11 +37,7 @@ export const SearchCard = ({ onFound }: { onFound: (card: ProductCard) => void }
         <Button variant="contained" onClick={submit} disabled={isFetching}>
           {isFetching ? 'Загрузка…' : 'Скачать фото'}
         </Button>
-        {error && (
-          <Alert severity="error">
-            Не удалось получить карточку. Возможно, нужен прокси (CORS).
-          </Alert>
-        )}
+        {error && <Alert severity="error">{getCardErrorMessage(error)}</Alert>}
       </Stack>
     </Box>
   );
