@@ -107,10 +107,11 @@ export const MediaSelectionModal = ({
     setBusy(true);
     try {
       const res = await fetch(videoUrl);
-      if (!res.ok) throw new Error('video fetch failed');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       triggerDownload(await res.blob(), `wb-${card.nm}.mp4`);
-    } catch {
-      setToast('Не удалось скачать видео.');
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'неизвестная ошибка';
+      setToast(`Не удалось скачать видео: ${reason}`);
     } finally {
       setBusy(false);
     }
