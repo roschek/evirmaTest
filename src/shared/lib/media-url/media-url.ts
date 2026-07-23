@@ -33,3 +33,15 @@ export function generateVideoUrl(args: {
   if (!host) return undefined;
   return `https://${host}/vol${vol}/part${part}/${nm}/hls/${size}/${name}`;
 }
+
+// A feedback (customer review) video's id is "{shard}/{uuid}", where shard is the
+// 1-based position of its host in the videofeedback_uuid_route_map from /api/v3/upstreams.
+// Confirmed live: shard "8" -> videofeedback08.wbbasket.ru -> https://{host}/{uuid}/index.m3u8.
+export function resolveVideoFeedbackUrl(videoId: string, hosts: string[]): string | undefined {
+  const [shardPart, uuid] = videoId.split('/');
+  const shard = Number(shardPart);
+  if (!uuid || !Number.isInteger(shard) || shard < 1) return undefined;
+  const host = hosts[shard - 1];
+  if (!host) return undefined;
+  return `https://${host}/${uuid}/index.m3u8`;
+}
