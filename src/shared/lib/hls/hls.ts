@@ -35,7 +35,12 @@ const transmuxToMp4 = (segments: Uint8Array<ArrayBuffer>[]): Promise<Blob> =>
     });
 
     try {
-      for (const segment of segments) transmuxer.push(segment);
+      // Consume front-to-back so each raw segment becomes GC-eligible as soon as
+      // mux.js has parsed it, instead of holding the whole video's raw bytes for
+      // the entire transmux.
+      while (segments.length > 0) {
+        transmuxer.push(segments.shift()!);
+      }
       transmuxer.flush();
     } catch (err) {
       reject(err instanceof Error ? err : new Error(String(err)));
@@ -58,12 +63,15 @@ export const downloadHlsAsMp4 = async (
   const segmentUrls = resolveSegmentUrls(playlistText, playlistUrl);
   if (segmentUrls.length === 0) throw new Error('Playlist has no segments');
 
-  const segments: Uint8Array<ArrayBuffer>[] = [];
-  for (const url of segmentUrls) {
-    const res = await fetchFn(url);
-    if (!res.ok) throw new Error(`Segment HTTP ${res.status}`);
-    segments.push(new Uint8Array(await res.arrayBuffer()));
-  }
+  // Segments are independent downloads -- fetch them concurrently instead of
+  // paying the sum of their round trips one at a time.
+  const segments = await Promise.all(
+    segmentUrls.map(async (url) => {
+      const res = await fetchFn(url);
+      if (!res.ok) throw new Error(`Segment HTTP ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    }),
+  );
 
   return transmuxToMp4(segments);
 };

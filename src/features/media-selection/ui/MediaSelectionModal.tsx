@@ -17,33 +17,18 @@ import {
 } from '@mui/material';
 import type { ProductCard } from '@/entities/product-card';
 import { useGetUpstreamsQuery, useGetFeedbacksQuery } from '@/entities/product-card';
-import { generateVideoUrl, resolveVideoFeedbackUrl, type HostRange } from '@/shared/lib/media-url';
+import type { HostRange } from '@/shared/lib/media-url';
 import { buildZipFromImages, triggerDownload } from '@/shared/lib/download';
 import { downloadHlsAsMp4 } from '@/shared/lib/hls';
-import { VIDEO_QUALITIES } from '@/shared/config';
 import { buildPhotoUrls } from '../lib/buildPhotoUrls';
+import { useVideoSources } from '../model/useVideoSources';
 
 // Stable references for the "no data yet" case -- a fresh `[]`/hooks default would
 // change identity on every render, which would re-trigger effects below in a loop.
 const EMPTY_RANGES: HostRange[] = [];
 const EMPTY_HOSTS: string[] = [];
 
-// The "classic" product-video scheme is real HLS (m3u8 playlist + .ts segments) --
-// WB never serves a progressive mp4 next to it -- so availability is probed against
-// the actual playlist name across quality tiers, highest first.
-const findClassicVideoPlaylist = async (nm: number, ranges: HostRange[]): Promise<string | null> => {
-  for (const quality of VIDEO_QUALITIES) {
-    const url = generateVideoUrl({ nm, ranges, size: quality, name: 'index.m3u8' });
-    if (!url) continue;
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      if (res.ok) return url;
-    } catch {
-      // network/CORS error on this quality -- try the next one
-    }
-  }
-  return null;
-};
+const videoFilename = (nm: number, index: number) => `wb-${nm}-video-${index + 1}.mp4`;
 
 export const MediaSelectionModal = ({
   open,
@@ -59,11 +44,18 @@ export const MediaSelectionModal = ({
   const videoRanges = upstreams?.videoRanges ?? EMPTY_RANGES;
   const videoFeedbackHosts = upstreams?.videoFeedbackHosts ?? EMPTY_HOSTS;
 
-  // Fallback source: a customer review video from the card's media carousel, used
+  // Fallback source: customer review videos from the card's media carousel, used
   // when the product has no video of its own. Public, CORS-open API keyed by `root`
   // (see README -- native "Wibes" clips aren't reachable without HTML scraping, but
   // review videos are a real, confirmed public endpoint).
   const { data: feedbacks, isFetching: feedbacksLoading } = useGetFeedbacksQuery(card.root);
+  const { videoSources, videoChecking } = useVideoSources(
+    card,
+    videoRanges,
+    videoFeedbackHosts,
+    feedbacks,
+    feedbacksLoading,
+  );
 
   const photoUrls = useMemo(
     () => buildPhotoUrls(card.nm, card.photoCount, ranges),
@@ -72,49 +64,12 @@ export const MediaSelectionModal = ({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  // undefined = still checking classic scheme, null = confirmed unavailable, string = playlist URL.
-  const [classicVideoUrl, setClassicVideoUrl] = useState<string | null | undefined>(undefined);
 
   // Select all photos by default, and whenever the resolved photo set changes
   // (e.g. host ranges arrive after the first render).
   useEffect(() => {
     setSelected(new Set(photoUrls));
   }, [photoUrls]);
-
-  useEffect(() => {
-    if (videoRanges.length === 0) return;
-    let cancelled = false;
-    setClassicVideoUrl(undefined);
-    findClassicVideoPlaylist(card.nm, videoRanges).then((url) => {
-      if (!cancelled) setClassicVideoUrl(url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [card.nm, videoRanges]);
-
-  // All ready feedback videos, not just the first -- the card can have several
-  // customer review videos, same as it can be seen on wildberries.ru itself.
-  const feedbackVideoUrls = useMemo(() => {
-    const urls: string[] = [];
-    for (const item of feedbacks?.feedbacks ?? []) {
-      if (!item.video?.isReady) continue;
-      const url = resolveVideoFeedbackUrl(item.video.id, videoFeedbackHosts);
-      if (url) urls.push(url);
-    }
-    return urls;
-  }, [feedbacks, videoFeedbackHosts]);
-
-  // Every playlist the app found a real source for: the card's own "classic" video
-  // (if any), followed by customer review videos. Each is downloadable independently.
-  const videoSources = useMemo(
-    () => (classicVideoUrl ? [classicVideoUrl, ...feedbackVideoUrls] : feedbackVideoUrls),
-    [classicVideoUrl, feedbackVideoUrls],
-  );
-
-  // Still resolving if the classic-scheme probe hasn't settled, or it came back empty
-  // and we're still waiting on the feedback-video fallback to load.
-  const videoChecking = classicVideoUrl === undefined || (classicVideoUrl === null && feedbacksLoading);
 
   const toggle = (url: string) => {
     setSelected((prev) => {
@@ -173,7 +128,7 @@ export const MediaSelectionModal = ({
           {videoSources.map((url, index) => (
             <ImageListItem key={url}>
               <ButtonBase
-                onClick={() => downloadVideo(url, `wb-${card.nm}-video-${index + 1}.mp4`)}
+                onClick={() => downloadVideo(url, videoFilename(card.nm, index))}
                 disabled={busy}
                 sx={{
                   display: 'flex',
@@ -207,7 +162,7 @@ export const MediaSelectionModal = ({
           {busy ? 'Загрузка…' : 'Скачать фото'}
         </Button>
         <Button
-          onClick={() => downloadVideo(videoSources[0], `wb-${card.nm}-video-1.mp4`)}
+          onClick={() => downloadVideo(videoSources[0], videoFilename(card.nm, 0))}
           disabled={busy || videoChecking || videoSources.length === 0}
           variant="outlined"
           startIcon={
